@@ -7,3 +7,5 @@ watchdog
 pytest
 pytest-mock
 pytest-cov
+passlib
+bcrypt

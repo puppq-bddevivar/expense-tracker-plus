@@ -7,12 +7,12 @@ import streamlit as st
 from lib.helpers import add_payment, list_payment_history, list_unpaid_bills
 
 
-def show():
+def show(user_id):
     st.header("Payments")
 
     # list_bills now uses eager loading (joinedload) from previous refactoring,
     # so accessing bill.biller.name here is safe.
-    bills = list_unpaid_bills()
+    bills = list_unpaid_bills(user_id)
 
     if not bills:
         st.info("No unpaid bills to pay.")
@@ -87,6 +87,7 @@ def show():
                 try:
                     # Convert float input to Decimal for financial accuracy
                     add_payment(
+                        user_id,
                         bill_id,
                         Decimal(str(final_amount)),
                         paid_on,
@@ -100,7 +101,7 @@ def show():
                     st.error(f"Error recording payment: {e}")
 
         st.subheader("Payments history")
-        rows = list_payment_history()
+        rows = list_payment_history(user_id)
 
         if rows:
             # Transform for display

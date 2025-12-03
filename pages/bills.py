@@ -5,7 +5,7 @@ import streamlit as st
 from lib.helpers import list_billers, add_bill, list_bills, update_bill, delete_bill
 
 
-def show():
+def show(user_id):
     st.header("Bills")
 
     # Common resources
@@ -27,7 +27,7 @@ def show():
     years = [str(y) for y in range(current_year - 2, current_year + 6)]
 
     # 1. Fetch billers for the dropdown
-    billers = list_billers()
+    billers = list_billers(user_id)
 
     tab_view, tab_add, tab_manage = st.tabs(["View List", "Add New", "Manage"])
 
@@ -75,6 +75,7 @@ def show():
                         try:
                             period_month = months.index(selected_month) + 1
                             add_bill(
+                                user_id,
                                 biller_id,
                                 amount,
                                 due_date,
@@ -89,7 +90,7 @@ def show():
 
     with tab_view:
         st.subheader("Existing Bills")
-        bills_data = list_bills()
+        bills_data = list_bills(user_id)
 
         if not bills_data:
             st.info("No bills recorded yet.")
@@ -118,7 +119,7 @@ def show():
         st.subheader("Edit or Delete Bill")
 
         # Fetch fresh data for management
-        bills_data_manage = list_bills()
+        bills_data_manage = list_bills(user_id)
 
         if not bills_data_manage:
             st.info("No bills to manage.")
@@ -220,6 +221,7 @@ def show():
 
                     try:
                         update_bill(
+                            user_id,
                             selected_bill.id,
                             biller_id_val,
                             new_amount,
@@ -241,7 +243,7 @@ def show():
                 help="Deleting this bill will remove associated payments as well.",
             ):
                 try:
-                    delete_bill(selected_bill.id)
+                    delete_bill(user_id, selected_bill.id)
                     st.success("Bill deleted.")
                     st.rerun()
                 except Exception as e:

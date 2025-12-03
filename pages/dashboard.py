@@ -5,15 +5,15 @@ import streamlit as st
 from lib.helpers import list_billers, list_bills, list_payments
 
 
-def show():
+def show(user_id):
     st.header("Dashboard")
 
     # Fetch data
     # In a high-scale production app, we would use specific SQL queries for aggregates
     # instead of loading all rows, but for this scale, loading into DF is acceptable.
-    billers = list_billers()
-    bills = list_bills()
-    payments = list_payments()
+    billers = list_billers(user_id)
+    bills = list_bills(user_id)
+    payments = list_payments(user_id)
 
     # --- Metrics Section ---
     total_billers = len(billers)

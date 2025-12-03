@@ -1,154 +1,89 @@
 import streamlit as st
 
-from lib.helpers import add_biller, list_billers, update_biller, delete_biller
-from lib.ui import data_frame_from_models
+from lib.helpers import list_billers, add_biller, update_biller, delete_biller
 
 
-def show():
-    st.header("Billers")
+def show(user_id):
+    st.header("Manage Billers")
 
-    tab_view, tab_add, tab_manage = st.tabs(["View List", "Add New", "Manage"])
+    tab_list, tab_new = st.tabs(["Registered Billers", "Add New Biller"])
 
-    # Fetch fresh data
-    rows = list_billers()
-
-    with tab_view:
-        st.subheader("Existing billers")
-        # Use shared UI helper
-        df = data_frame_from_models(
-            rows, columns=["id", "name", "biller_type", "account"]
-        )
-
-        if not df.empty:
-            # Rename columns for better display
-            df = df.rename(
-                columns={"biller_type": "type", "name": "biller", "id": "ID"}
-            )
-            st.dataframe(df, use_container_width=True, hide_index=True)
-        else:
-            st.info("No billers found.")
-
-    with tab_add:
-        st.subheader("Add New Biller")
-        # Use clear_on_submit=True to reset the form after adding
+    with tab_new:
         with st.form("add_biller_form", clear_on_submit=True):
-            name = st.text_input("Biller name")
-            btype = st.selectbox(
+            st.subheader("Add New Biller")
+            name = st.text_input("Biller Name (e.g. Meralco, PLDT)")
+            b_type = st.selectbox(
                 "Type",
-                [
-                    "Electricity",
-                    "Internet",
-                    "Water",
-                    "Gas",
-                    "Phone",
-                    "Credit Card",
-                    "Bank Loan",
-                    "Insurance",
-                    "Rent",
-                    "Other",
-                ],
+                ["Utility", "Credit Card", "Internet", "Rent", "Insurance", "Other"],
             )
-            acct = st.text_input("Account / Reference")
+            account = st.text_input("Account / Policy Number")
             notes = st.text_area("Notes")
 
-            submitted = st.form_submit_button("Save")
+            submitted = st.form_submit_button("Save Biller")
 
             if submitted:
-                if not name.strip():
-                    st.warning("Please enter a biller name")
+                if not name:
+                    st.error("Biller name is required")
                 else:
                     try:
-                        add_biller(name, btype, acct, notes)
-                        st.success("Biller saved successfully")
+                        add_biller(user_id, name, b_type, account, notes)
+                        st.success(f"Biller '{name}' added successfully!")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Error saving biller: {e}")
+                        st.error(f"Error adding biller: {e}")
 
-    with tab_manage:
-        st.subheader("Edit or Delete Biller")
-        if not rows:
-            st.info("No billers to manage.")
+    with tab_list:
+        billers = list_billers(user_id)
+        if not billers:
+            st.info("No billers found.")
         else:
-            biller_map = {f"{b.name} ({b.biller_type})": b for b in rows}
-            selected_label = st.selectbox(
-                "Select Biller", options=list(biller_map.keys())
-            )
-            selected_biller = biller_map[selected_label]
+            for b in billers:
+                with st.expander(f"{b.name} ({b.biller_type})"):
+                    with st.form(f"edit_biller_{b.id}"):
+                        e_name = st.text_input("Name", value=b.name)
+                        e_type = st.selectbox(
+                            "Type",
+                            [
+                                "Utility",
+                                "Credit Card",
+                                "Internet",
+                                "Rent",
+                                "Insurance",
+                                "Other",
+                            ],
+                            index=(
+                                [
+                                    "Utility",
+                                    "Credit Card",
+                                    "Internet",
+                                    "Rent",
+                                    "Insurance",
+                                    "Other",
+                                ].index(b.biller_type)
+                                if b.biller_type
+                                in [
+                                    "Utility",
+                                    "Credit Card",
+                                    "Internet",
+                                    "Rent",
+                                    "Insurance",
+                                    "Other",
+                                ]
+                                else 5
+                            ),
+                        )
+                        e_account = st.text_input("Account", value=b.account or "")
+                        e_notes = st.text_area("Notes", value=b.notes or "")
 
-            st.divider()
-
-            # Edit Form
-            # Key the form widgets with ID to ensure they refresh when selection changes
-            with st.form("edit_biller_form"):
-                new_name = st.text_input(
-                    "Biller name",
-                    value=selected_biller.name,
-                    key=f"edit_name_{selected_biller.id}",
-                )
-
-                types = [
-                    "Electricity",
-                    "Internet",
-                    "Water",
-                    "Gas",
-                    "Phone",
-                    "Credit Card",
-                    "Bank Loan",
-                    "Insurance",
-                    "Rent",
-                    "Other",
-                ]
-                try:
-                    type_index = types.index(selected_biller.biller_type)
-                except ValueError:
-                    type_index = len(types) - 1
-
-                new_type = st.selectbox(
-                    "Type",
-                    types,
-                    index=type_index,
-                    key=f"edit_type_{selected_biller.id}",
-                )
-                new_acct = st.text_input(
-                    "Account / Reference",
-                    value=selected_biller.account or "",
-                    key=f"edit_acct_{selected_biller.id}",
-                )
-                new_notes = st.text_area(
-                    "Notes",
-                    value=selected_biller.notes or "",
-                    key=f"edit_notes_{selected_biller.id}",
-                )
-
-                update_submitted = st.form_submit_button("Update Biller")
-
-                if update_submitted:
-                    if not new_name.strip():
-                        st.warning("Name cannot be empty")
-                    else:
-                        try:
-                            update_biller(
-                                selected_biller.id,
-                                new_name,
-                                new_type,
-                                new_acct,
-                                new_notes,
-                            )
-                            st.success("Biller updated.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error updating: {e}")
-
-            st.write("Danger Zone")
-            if st.button(
-                "Delete this Biller",
-                key=f"del_btn_{selected_biller.id}",
-                type="primary",
-                help="Deleting a biller will also delete all associated bills and payments.",
-            ):
-                try:
-                    delete_biller(selected_biller.id)
-                    st.success("Biller deleted.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error deleting: {e}")
+                        c1, c2 = st.columns([1, 4])
+                        with c1:
+                            if st.form_submit_button("Delete", type="primary"):
+                                delete_biller(user_id, b.id)
+                                st.rerun()
+                        with c2:
+                            if st.form_submit_button("Update"):
+                                update_biller(
+                                    user_id, b.id, e_name, e_type, e_account, e_notes
+                                )
+                                st.success("Updated!")
+                                st.rerun()
