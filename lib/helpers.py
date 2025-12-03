@@ -19,6 +19,7 @@ from lib.models import (
 # --- Auth Helpers ---
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+MAX_PASSWORD_BYTES = 72
 
 
 def check_rate_limit(username):
@@ -49,13 +50,22 @@ def log_login_attempt(username, success):
 
 
 def hash_password(password):
-    """Hash a password for storing."""
+    """Hash a password for storing, respecting bcrypt's byte limit."""
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise ValueError(
+            f"Password cannot be longer than {MAX_PASSWORD_BYTES} bytes (typically {MAX_PASSWORD_BYTES} characters)."
+        )
     return pwd_context.hash(password)
 
 
 def verify_password(plain_password, hashed_password):
     """Verify a stored password against one provided by user."""
-    return pwd_context.verify(plain_password, hashed_password)
+    # Truncate the provided password to the max length before verification
+    # to match how it would have been hashed.
+    truncated_password = plain_password.encode("utf-8")[:MAX_PASSWORD_BYTES].decode(
+        "utf-8", "ignore"
+    )
+    return pwd_context.verify(truncated_password, hashed_password)
 
 
 def register_user(username, password, full_name=None, email=None):
@@ -155,16 +165,12 @@ def add_biller(user_id, name, biller_type=None, account=None, notes=None):
 
 def list_billers(user_id):
     with provide_session() as db:
-        # No relationships to eager load here currently, but good practice to expunge
-        # if we want them to be usable after session close without lazy load errors.
         rows = (
             db.query(Biller)
             .filter(Biller.user_id == user_id)
             .order_by(Biller.name)
             .all()
         )
-        # Determine if we need to eagerly load relationships.
-        # Currently Biller doesn't have parents accessed in UI list.
         return rows
 
 
@@ -226,8 +232,6 @@ def add_bill(
 
 def list_bills(user_id):
     with provide_session() as db:
-        # Use joinedload to fetch the related 'biller' object immediately.
-        # This prevents DetachedInstanceError when accessing bill.biller.name in the UI.
         rows = (
             db.query(Bill)
             .filter(Bill.user_id == user_id)
@@ -277,7 +281,6 @@ def update_bill(
         if status:
             bill.status = status
 
-        # Recalculate balance in case amount changed
         total_paid = sum([p.amount for p in bill.payments])
         bill.balance_amount = bill.amount - total_paid
 
@@ -309,7 +312,6 @@ def add_payment(
         paid_on = datetime.today().date()
 
     with provide_session() as db:
-        # Retrieve bill first to get snapshot data for history
         bill = (
             db.query(Bill)
             .options(joinedload(Bill.biller))
@@ -331,13 +333,9 @@ def add_payment(
             status=status,
         )
         db.add(p)
-        # Flush to generate ID and ensure payment is visible in relationship calculation
         db.flush()
 
-        # Calculate total paid including the new payment
         total_paid = sum([pay.amount for pay in bill.payments])
-
-        # Update balance amount
         bill.balance_amount = bill.amount - total_paid
 
         final_status = "partial"
@@ -348,7 +346,6 @@ def add_payment(
             bill.status = "partial"
             final_status = "partial"
 
-        # Create Payment History Log (Snapshot)
         history = PaymentHistory(
             user_id=user_id,
             bill_id=bill.id,
@@ -357,7 +354,7 @@ def add_payment(
             balance_amount=bill.balance_amount,
             due_date=bill.due_date,
             paid_on=paid_on,
-            status=final_status,  # Use the calculated status (partial or paid)
+            status=final_status,
             method=method,
             reference=reference,
         )
@@ -370,7 +367,6 @@ def add_payment(
 
 def list_payments(user_id):
     with provide_session() as db:
-        # Eager load Bill and Bill.biller to display biller name in history
         rows = (
             db.query(Payment)
             .filter(Payment.user_id == user_id)

@@ -20,7 +20,7 @@ from pages import dashboard, billers, bills, payments
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-st.set_page_config(page_title="Expense Tracker Plus App", layout="wide")
+st.set_page_config(page_title="Bills & Expenses", layout="wide")
 
 
 # --- Main App Setup ---
@@ -215,6 +215,8 @@ def password_reset_screen(token):
                     st.query_params.clear()
                     if st.button("Go to Login"):
                         st.rerun()
+                except ValueError as e:
+                    st.error(str(e))
                 except Exception as e:
                     logger.error(f"Password reset failed for user {user.id}: {e}")
                     st.error("An unexpected error occurred. Please try again.")
