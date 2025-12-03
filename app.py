@@ -20,7 +20,7 @@ from pages import dashboard, billers, bills, payments
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-st.set_page_config(page_title="Bills & Expenses", layout="wide")
+st.set_page_config(page_title="Expense Tracker Plus App", layout="wide")
 
 
 # --- Main App Setup ---
@@ -105,6 +105,9 @@ def render_register_tab():
     with st.form("register_form"):
         new_user = st.text_input("Username", key="reg_user")
         new_pass = st.text_input("Password", type="password", key="reg_pass")
+        confirm_pass = st.text_input(
+            "Confirm Password", type="password", key="reg_confirm_pass"
+        )
         new_email = st.text_input("Email", key="reg_email")
         new_name = st.text_input("Full Name", key="reg_name")
         math_input = st.text_input(
@@ -120,6 +123,10 @@ def render_register_tab():
 
             if not new_user or not new_pass:
                 st.error("Username and password are required")
+                return
+
+            if new_pass != confirm_pass:
+                st.error("Passwords do not match.")
                 return
 
             try:
