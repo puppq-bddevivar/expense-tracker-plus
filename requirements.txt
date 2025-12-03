@@ -1,0 +1,9 @@
+streamlit
+sqlalchemy
+pandas
+plotly
+pandas-stubs
+watchdog
+pytest
+pytest-mock
+pytest-cov
