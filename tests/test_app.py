@@ -7,7 +7,7 @@ from streamlit.testing.v1 import AppTest
 # Add project root to path to allow imports from lib and pages
 sys.path.insert(0, ".")
 
-from run import main, setup_application
+from app import main, setup_application
 
 
 @pytest.fixture
@@ -34,12 +34,12 @@ def test_main_router_navigation(mock_pages):
 
     # Dashboard is the default
     assert at.radio[0].value == "Dashboard"
-    from run import dashboard
+    from app import dashboard
 
     dashboard.show.assert_called_once()
 
     # Select another page
     at.radio[0].set_value("Payments").run()
-    from run import payments
+    from app import payments
 
     payments.show.assert_called_once()
