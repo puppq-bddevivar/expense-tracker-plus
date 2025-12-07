@@ -1,8 +1,8 @@
 import secrets
 from datetime import datetime, timedelta
 
-from passlib.context import CryptContext
 from sqlalchemy.orm import joinedload
+import streamlit_authenticator as stauth
 
 from lib.db import provide_session
 from lib.models import (
@@ -12,60 +12,15 @@ from lib.models import (
     PaymentHistory,
     UserAuth,
     UserProfile,
-    LoginAttempt,
     PasswordResetToken,
 )
 
 # --- Auth Helpers ---
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-MAX_PASSWORD_BYTES = 72
 
-
-def check_rate_limit(username):
-    """
-    Check if the username has exceeded 10 failed login attempts in the last 24 hours.
-    Returns True if login is allowed, False if blocked.
-    """
-    with provide_session() as db:
-        cutoff_time = datetime.now() - timedelta(hours=24)
-        failed_count = (
-            db.query(LoginAttempt)
-            .filter(
-                LoginAttempt.username == username,
-                LoginAttempt.success == False,
-                LoginAttempt.attempt_time >= cutoff_time,
-            )
-            .count()
-        )
-        return failed_count < 10
-
-
-def log_login_attempt(username, success):
-    """Log a login attempt."""
-    with provide_session() as db:
-        attempt = LoginAttempt(username=username, success=success)
-        db.add(attempt)
-        db.commit()
-
-
-def hash_password(password):
-    """Hash a password for storing, respecting bcrypt's byte limit."""
-    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
-        raise ValueError(
-            f"Password cannot be longer than {MAX_PASSWORD_BYTES} bytes (typically {MAX_PASSWORD_BYTES} characters)."
-        )
-    return pwd_context.hash(password)
-
-
-def verify_password(plain_password, hashed_password):
-    """Verify a stored password against one provided by user."""
-    # Truncate the provided password to the max length before verification
-    # to match how it would have been hashed.
-    truncated_password = plain_password.encode("utf-8")[:MAX_PASSWORD_BYTES].decode(
-        "utf-8", "ignore"
-    )
-    return pwd_context.verify(truncated_password, hashed_password)
+def hash_password(password: str) -> str:
+    """Hash a password for storing."""
+    return stauth.Hasher().hash(password)
 
 
 def register_user(username, password, full_name=None, email=None):
@@ -82,16 +37,6 @@ def register_user(username, password, full_name=None, email=None):
         db.add(profile)
         db.commit()
         return user
-
-
-def authenticate_user(username, password):
-    with provide_session() as db:
-        user = db.query(UserAuth).filter_by(username=username).first()
-        if not user:
-            return None
-        if verify_password(user.password_hash, password):
-            return user
-        return None
 
 
 def create_password_reset_token(user_id: int) -> str:

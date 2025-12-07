@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from datetime import datetime, timedelta
 
 from lib.helpers import list_billers, list_bills, list_payments
 
@@ -35,13 +36,16 @@ def show(user_id):
                 }
             )
         df_bills = pd.DataFrame(data_bills)
+        df_bills["due"] = pd.to_datetime(df_bills["due"])
 
         unpaid_mask = df_bills["status"] != "paid"
         # Sum the 'outstanding' column for total debt, not the original 'amount'
         total_outstanding = df_bills[unpaid_mask]["outstanding"].sum()
         count_outstanding = df_bills[unpaid_mask].shape[0]
     else:
-        df_bills = pd.DataFrame()
+        df_bills = pd.DataFrame(
+            columns=["biller", "amount", "outstanding", "status", "due"]
+        )
         total_outstanding = 0.0
         count_outstanding = 0
 
@@ -52,6 +56,34 @@ def show(user_id):
     m3.metric("Pending Bills", count_outstanding)
 
     st.divider()
+
+    # --- Semi-Annual Bill Summary ---
+    st.subheader("Semi-Annual Bill Summary")
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=180)
+
+    # Filter bills for the last 6 months
+    mask = (df_bills["due"] >= start_date) & (df_bills["due"] <= end_date)
+    semi_annual_bills = df_bills.loc[mask].copy()
+
+    if not semi_annual_bills.empty:
+        # Group by year and month, then sum the amounts
+        semi_annual_bills["month_year"] = semi_annual_bills["due"].dt.to_period("M")
+        monthly_summary = (
+            semi_annual_bills.groupby("month_year")["amount"].sum().reset_index()
+        )
+        monthly_summary["month_year"] = monthly_summary["month_year"].astype(str)
+
+        st.bar_chart(
+            monthly_summary.rename(columns={"month_year": "Month", "amount": "Total Amount"}),
+            x="Month",
+            y="Total Amount",
+        )
+    else:
+        st.info("No bills recorded in the last 6 months.")
+
+    st.divider()
+
 
     col1, col2 = st.columns(2)
 

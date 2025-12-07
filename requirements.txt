@@ -9,3 +9,6 @@ pytest-mock
 pytest-cov
 passlib
 bcrypt
+streamlit-authenticator
+captcha
+Pillow
